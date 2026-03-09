@@ -1,0 +1,13 @@
+{
+  "type": "micro_wake_word_model",
+  "wake_word": "hey amy",
+  "author": "your-name",
+  "website": "",
+  "model": "hey_amy.tflite",
+  "version": 1,
+  "micro": {
+    "probability_cutoff": 0.84,
+    "sliding_window_average": 10,
+    "tensor_arena_size": 30000
+  }
+}
