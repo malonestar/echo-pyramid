@@ -1,13 +1,12 @@
 {
-  "type": "micro_wake_word_model",
+  "type": "micro",
   "wake_word": "hey amy",
-  "author": "your-name",
-  "website": "",
+  "author": "malonestar",
+  "website": "https://github.com/malonestar",
   "model": "hey_amy.tflite",
   "version": 1,
   "micro": {
     "probability_cutoff": 0.84,
-    "sliding_window_average": 10,
-    "tensor_arena_size": 30000
+    "sliding_window_average_size": 10
   }
 }

@@ -3,10 +3,10 @@
   "wake_word": "hey frank",
   "author": "malonestar",
   "website": "https://github.com/malonestar",
-  "model": "hey_frank.tflite",
+  "model": "hey_frank_v3.tflite",
   "version": 1,
   "micro": {
-    "probability_cutoff": 0.98,
-    "sliding_window_average_size": 10
+    "probability_cutoff": 0.90,
+    "sliding_window_average_size": 20
   }
 }
