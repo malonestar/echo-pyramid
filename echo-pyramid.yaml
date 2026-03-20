@@ -3,13 +3,14 @@ substitutions:
   name: atoms3r-with-echo-pyramid
   friendly_name: AtomS3R Echo Pyramid Voice Assistant
 
-  # Casita images
-  loading_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
-  idle_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
-  listening_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
-  thinking_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
-  replying_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
-  error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
+  # Local images
+  loading_illustration_file: media/loading_240v2.png
+  idle_illustration_file: media/idle_240v2.png
+  listening_illustration_file: media/listening_240v2.png
+  thinking_illustration_file: media/thinking_240v2.png
+  replying_illustration_file: media/replying_240v2.png
+  error_illustration_file: media/error_240v2.png
+  timer_finished_illustration_file: media/timer_finished_240v2.png
   error_no_wifi_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-wifi.png
   error_no_ha_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-ha.png
 
@@ -314,6 +315,7 @@ switch:
     on_turn_off:
       - microphone.unmute:
       - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      - script.execute: idle_sleep_timer
       - script.execute: draw_display
 
     on_turn_on:
@@ -450,6 +452,8 @@ micro_wake_word:
       id: hey_m5_v2
   vad:
   on_wake_word_detected:
+    # Wake display if sleeping before doing anything visible
+    - script.execute: wake_from_sleep
     # play_sound first — audio buffering latency (~50-100ms) means the tone becomes
     # audible at roughly the same moment the LED sweep fires visually
     - script.execute:
@@ -483,9 +487,13 @@ voice_assistant:
   auto_gain: 31dBFS
   volume_multiplier: 2.0
   on_listening:
+    # Also covers HA-side wake word mode (on_wake_word_detected doesn't fire in that case)
+    - script.execute: wake_from_sleep
     - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
     - script.execute: draw_display
+    - script.execute: listening_pulse
   on_stt_vad_end:
+    - script.stop: listening_pulse
     - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
     - script.execute: draw_display
     - script.execute: thinking_animation
@@ -780,6 +788,7 @@ output:
 light:
   - platform: monochromatic
     name: "LCD Backlight"
+    id: lcd_backlight
     output: lp5562_white_channel
     icon: "mdi:television"
     restore_mode: RESTORE_DEFAULT_ON
@@ -864,6 +873,10 @@ display:
         lambda: |-
           it.fill(id(loading_color));
           it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_initializing), ImageAlign::CENTER);
+      - id: timer_finished_page
+        lambda: |-
+          it.fill(Color::BLACK);
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_timer_finished), ImageAlign::CENTER);
       - id: muted_page
         lambda: |-
           it.fill(Color::BLACK);
@@ -917,6 +930,7 @@ script:
             switch.is_off: mute
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+            - script.execute: idle_sleep_timer
           else:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
 
@@ -1138,6 +1152,75 @@ script:
                 transition_length: 100ms
             - delay: 190ms
 
+  - id: listening_pulse
+    then:
+      # All 4 strips breathe together: 100%↔50% cyan. ~2.3s cycle.
+      # while condition exits cleanly the moment phase leaves listening.
+      - while:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+          then:
+            # Inhale — brighten to 100%
+            - light.turn_on:
+                id: strip1_group1
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 1.0
+                transition_length: 900ms
+            - light.turn_on:
+                id: strip1_group2
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 1.0
+                transition_length: 900ms
+            - light.turn_on:
+                id: strip2_group1
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 1.0
+                transition_length: 900ms
+            - light.turn_on:
+                id: strip2_group2
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 1.0
+                transition_length: 900ms
+            - delay: 1000ms
+            # Exhale — dim to 50% (slightly slower for natural feel)
+            - light.turn_on:
+                id: strip1_group1
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 0.50
+                transition_length: 1100ms
+            - light.turn_on:
+                id: strip1_group2
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 0.50
+                transition_length: 1100ms
+            - light.turn_on:
+                id: strip2_group1
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 0.50
+                transition_length: 1100ms
+            - light.turn_on:
+                id: strip2_group2
+                red: 0.0
+                green: 0.8
+                blue: 1.0
+                brightness: 0.50
+                transition_length: 1100ms
+            - delay: 1300ms
+
   - id: draw_display
     then:
       - script.execute: update_leds
@@ -1169,6 +1252,10 @@ script:
                                 break;
                               case ${voice_assist_error_phase_id}:
                                 id(atoms3r_lcd).show_page(error_page);
+                                id(atoms3r_lcd).update();
+                                break;
+                              case ${voice_assist_timer_finished_phase_id}:
+                                id(atoms3r_lcd).show_page(timer_finished_page);
                                 id(atoms3r_lcd).update();
                                 break;
                               case ${voice_assist_muted_phase_id}:
@@ -1266,45 +1353,85 @@ script:
               break;
           }
 
+  # Idle sleep: after 2 minutes of idle, fade out backlight and all LED strips.
+  # mode: restart ensures any new idle entry resets the countdown.
+  - id: idle_sleep_timer
+    mode: restart
+    then:
+      - delay: 2min
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - light.turn_off:
+                id: lcd_backlight
+                transition_length: 3s
+            - light.turn_off:
+                id: strip1_group1
+                transition_length: 3s
+            - light.turn_off:
+                id: strip1_group2
+                transition_length: 3s
+            - light.turn_off:
+                id: strip2_group1
+                transition_length: 3s
+            - light.turn_off:
+                id: strip2_group2
+                transition_length: 3s
+
+  # Wake from sleep: cancel the idle timer and restore the backlight.
+  # LEDs are restored by wake_word_sweep / update_leds immediately after.
+  - id: wake_from_sleep
+    then:
+      - script.stop: idle_sleep_timer
+      - light.turn_on:
+          id: lcd_backlight
+          transition_length: 300ms
+
 image:
   - file: ${error_illustration_file}
     id: casita_error
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${idle_illustration_file}
     id: casita_idle
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${listening_illustration_file}
     id: casita_listening
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${thinking_illustration_file}
     id: casita_thinking
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${replying_illustration_file}
     id: casita_replying
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${loading_illustration_file}
     id: casita_initializing
-    resize: 160x120
+    resize: 128x128
+    type: RGB
+    transparency: alpha_channel
+  - file: ${timer_finished_illustration_file}
+    id: casita_timer_finished
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${error_no_wifi_illustration_file}
     id: error_no_wifi
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
   - file: ${error_no_ha_illustration_file}
     id: error_no_ha
-    resize: 160x120
+    resize: 128x128
     type: RGB
     transparency: alpha_channel
 
