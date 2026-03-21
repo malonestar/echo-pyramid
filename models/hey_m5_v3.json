@@ -1,13 +1,13 @@
 {
   "type": "micro",
-  "wake_word": "hey frank v3",
+  "wake_word": "hey m5 v3",
   "author": "malonestar",
   "website": "https://github.com/malonestar",
-  "model": "hey_frank_v3.tflite",
+  "model": "hey_m5_v3.tflite",
   "trained_languages": ["en"],
   "version": 2,
   "micro": {
-    "probability_cutoff": 0.93,
+    "probability_cutoff": 0.50,
     "feature_step_size": 10,
     "sliding_window_size": 5,
     "tensor_arena_size": 30000,

@@ -26,7 +26,7 @@ substitutions:
   hey_frank_v3_model_file: models/hey_frank_v3.json
   hey_frank_v5_model_file: models/hey_frank_v5.json
   hey_m5_v1_model_file: models/hey_m5_v1.json
-  hey_m5_v2_model_file: models/hey_m5_v2.json
+  hey_m5_v3_model_file: models/hey_m5_v3.json
 
   # Background colors
   loading_illustration_background_color: '000000'
@@ -422,20 +422,20 @@ select:
       # These cutoffs apply only to the specific models included in the firmware: hey_frank_v3, hey_frank_v5, hey_m5_v1
       lambda: |-
         if (x == "Slightly sensitive") {
-          id(hey_frank).set_probability_cutoff(237);      // v3: 0.93 -> 0.187 FAPH
+          id(hey_frank_v3).set_probability_cutoff(237);      // v3: 0.93 -> 0.187 FAPH
           id(hey_frank_v5).set_probability_cutoff(217);   // v5: 0.85 -> 0.187 FAPH
-          id(hey_m5_v1).set_probability_cutoff(84);       // 0.33 -> 0.187 FAPH
-          id(hey_m5_v2).set_probability_cutoff(148);      // 0.58 -> 0.187 FAPH
+          id(hey_m5_v1).set_probability_cutoff(84);       // v1: 0.33 -> 0.187 FAPH
+          id(hey_m5_v3).set_probability_cutoff(110);      // v3: 0.43 -> 0.187 FAPH
         } else if (x == "Moderately sensitive") {
-          id(hey_frank).set_probability_cutoff(230);      // v3: 0.90 -> 0.562 FAPH
+          id(hey_frank_v3).set_probability_cutoff(230);      // v3: 0.90 -> 0.562 FAPH
           id(hey_frank_v5).set_probability_cutoff(191);   // v5: 0.75 -> 0.375 FAPH
-          id(hey_m5_v1).set_probability_cutoff(46);       // 0.18 -> 0.375 FAPH
-          id(hey_m5_v2).set_probability_cutoff(120);      // 0.47 -> 0.375 FAPH
+          id(hey_m5_v1).set_probability_cutoff(46);       // v1: 0.18 -> 0.375 FAPH
+          id(hey_m5_v3).set_probability_cutoff(74);       // v3: 0.29 -> 0.375 FAPH
         } else if (x == "Very sensitive") {
-          id(hey_frank).set_probability_cutoff(145);      // v3: 0.57 -> 0.937 FAPH
+          id(hey_frank_v3).set_probability_cutoff(145);      // v3: 0.57 -> 0.937 FAPH
           id(hey_frank_v5).set_probability_cutoff(145);   // v5: 0.57 -> 0.937 FAPH
-          id(hey_m5_v1).set_probability_cutoff(26);       // 0.10 -> 1.125 FAPH
-          id(hey_m5_v2).set_probability_cutoff(64);       // 0.25 -> 0.937 FAPH
+          id(hey_m5_v1).set_probability_cutoff(26);       // v1: 0.10 -> 1.125 FAPH
+          id(hey_m5_v3).set_probability_cutoff(18);       // v3: 0.07 -> 0.750 FAPH
         }
 
 micro_wake_word:
@@ -443,13 +443,13 @@ micro_wake_word:
   microphone: i2s_mic
   models:
     - model: ${hey_frank_v3_model_file}
-      id: hey_frank
+      id: hey_frank_v3
     - model: ${hey_frank_v5_model_file}
       id: hey_frank_v5
     - model: ${hey_m5_v1_model_file}
       id: hey_m5_v1
-    - model: ${hey_m5_v2_model_file}
-      id: hey_m5_v2
+    - model: ${hey_m5_v3_model_file}
+      id: hey_m5_v3
   vad:
   on_wake_word_detected:
     # Wake display if sleeping before doing anything visible
