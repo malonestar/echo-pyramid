@@ -3,6 +3,9 @@ substitutions:
   name: atoms3r-with-echo-pyramid
   friendly_name: AtomS3R Echo Pyramid Voice Assistant
 
+  # Display mode: "true" = procedural animations, "false" = static PNG images
+  dynamic_display: "true"
+
   # Local images
   loading_illustration_file: media/loading_240v2.png
   idle_illustration_file: media/idle_240v2.png
@@ -27,6 +30,7 @@ substitutions:
   hey_frank_v5_model_file: models/hey_frank_v5.json
   hey_m5_v1_model_file: models/hey_m5_v1.json
   hey_m5_v3_model_file: models/hey_m5_v3.json
+  hey_stackchan_v1_model_file: models/hey_stackchan_v1.json
 
   # Background colors
   loading_illustration_background_color: '000000'
@@ -81,6 +85,9 @@ esp32:
 psram:
   mode: octal
   speed: 80MHz
+
+packages:
+  display: !include atoms3r_display.yaml
 
 api:
   encryption:
@@ -142,8 +149,14 @@ binary_sensor:
 
 
 external_components:
+  # Local override for pyramidrgb: deferred writes via dirty flags eliminate
+  # per-component I2C storms and intermediate-color flickering.
+  - source:
+      type: local
+      path: components
+    components: [pyramidrgb]
   - source: github://m5stack/esphome-yaml/components
-    components: [aw87559,si5351,lp5562,pyramidrgb,pyramidtouch]
+    components: [aw87559,si5351,lp5562,pyramidtouch]
     refresh: 0s
 
 # I2C Bus Configuration
@@ -423,19 +436,22 @@ select:
       lambda: |-
         if (x == "Slightly sensitive") {
           id(hey_frank_v3).set_probability_cutoff(237);      // v3: 0.93 -> 0.187 FAPH
-          id(hey_frank_v5).set_probability_cutoff(217);   // v5: 0.85 -> 0.187 FAPH
-          id(hey_m5_v1).set_probability_cutoff(84);       // v1: 0.33 -> 0.187 FAPH
-          id(hey_m5_v3).set_probability_cutoff(110);      // v3: 0.43 -> 0.187 FAPH
+          id(hey_frank_v5).set_probability_cutoff(217);      // v5: 0.85 -> 0.187 FAPH
+          id(hey_m5_v1).set_probability_cutoff(84);          // v1: 0.33 -> 0.187 FAPH
+          id(hey_m5_v3).set_probability_cutoff(110);         // v3: 0.43 -> 0.187 FAPH
+          id(hey_stackchan_v1).set_probability_cutoff(207);  // v1: 0.81 -> 0.187 FAPH
         } else if (x == "Moderately sensitive") {
           id(hey_frank_v3).set_probability_cutoff(230);      // v3: 0.90 -> 0.562 FAPH
-          id(hey_frank_v5).set_probability_cutoff(191);   // v5: 0.75 -> 0.375 FAPH
-          id(hey_m5_v1).set_probability_cutoff(46);       // v1: 0.18 -> 0.375 FAPH
-          id(hey_m5_v3).set_probability_cutoff(74);       // v3: 0.29 -> 0.375 FAPH
+          id(hey_frank_v5).set_probability_cutoff(191);      // v5: 0.75 -> 0.375 FAPH
+          id(hey_m5_v1).set_probability_cutoff(46);          // v1: 0.18 -> 0.375 FAPH
+          id(hey_m5_v3).set_probability_cutoff(74);          // v3: 0.29 -> 0.375 FAPH
+          id(hey_stackchan_v1).set_probability_cutoff(194);  // v1: 0.76 -> 0.375 FAPH
         } else if (x == "Very sensitive") {
           id(hey_frank_v3).set_probability_cutoff(145);      // v3: 0.57 -> 0.937 FAPH
-          id(hey_frank_v5).set_probability_cutoff(145);   // v5: 0.57 -> 0.937 FAPH
-          id(hey_m5_v1).set_probability_cutoff(26);       // v1: 0.10 -> 1.125 FAPH
-          id(hey_m5_v3).set_probability_cutoff(18);       // v3: 0.07 -> 0.750 FAPH
+          id(hey_frank_v5).set_probability_cutoff(145);      // v5: 0.57 -> 0.937 FAPH
+          id(hey_m5_v1).set_probability_cutoff(26);          // v1: 0.10 -> 1.125 FAPH
+          id(hey_m5_v3).set_probability_cutoff(18);          // v3: 0.07 -> 0.750 FAPH
+          id(hey_stackchan_v1).set_probability_cutoff(133);  // v1: 0.52 -> 0.750 FAPH
         }
 
 micro_wake_word:
@@ -450,6 +466,8 @@ micro_wake_word:
       id: hey_m5_v1
     - model: ${hey_m5_v3_model_file}
       id: hey_m5_v3
+    - model: ${hey_stackchan_v1_model_file}
+      id: hey_stackchan_v1
   vad:
   on_wake_word_detected:
     # Wake display if sleeping before doing anything visible
@@ -593,6 +611,7 @@ globals:
 
 sensor:
   - platform: pyramidtouch
+    id: pyramid_touch
     address: 0x1A
     i2c_id: ext_bus
     update_interval: 50ms
@@ -826,62 +845,6 @@ light:
 
 
 
-display:
-  - platform: mipi_spi
-    id: atoms3r_lcd
-    model: ST7789V
-    dc_pin: GPIO42
-    reset_pin: GPIO48
-    cs_pin: GPIO14
-    data_rate: 40MHz
-    dimensions:
-      height: 128
-      width: 128
-      offset_width: 2
-      offset_height: 1
-
-    invert_colors: true
-    rotation: 0°
-    pages:
-      - id: idle_page
-        lambda: |-
-          it.fill(id(idle_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_idle), ImageAlign::CENTER);
-      - id: listening_page
-        lambda: |-
-          it.fill(id(listening_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_listening), ImageAlign::CENTER);
-      - id: thinking_page
-        lambda: |-
-          it.fill(id(thinking_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_thinking), ImageAlign::CENTER);
-      - id: replying_page
-        lambda: |-
-          it.fill(id(replying_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_replying), ImageAlign::CENTER);
-      - id: error_page
-        lambda: |-
-          it.fill(id(error_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_error), ImageAlign::CENTER);
-      - id: no_ha_page
-        lambda: |-
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_ha), ImageAlign::CENTER);
-      - id: no_wifi_page
-        lambda: |-
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_wifi), ImageAlign::CENTER);
-      - id: initializing_page
-        lambda: |-
-          it.fill(id(loading_color));
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_initializing), ImageAlign::CENTER);
-      - id: timer_finished_page
-        lambda: |-
-          it.fill(Color::BLACK);
-          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_timer_finished), ImageAlign::CENTER);
-      - id: muted_page
-        lambda: |-
-          it.fill(Color::BLACK);
-          it.printf(0, 0, id(mdi_icon_128), Color::WHITE, "%s", "\U000F036D");
-
 script:
   # Starts either mWW or the streaming wake word, depending on the configured location
   - id: start_wake_word
@@ -994,23 +957,7 @@ script:
 
   - id: wake_word_sweep
     then:
-      # Step 1: Front corners ignite first (user-facing side)
-      - light.turn_on:
-          id: strip1_group2
-          red: 1.0
-          green: 1.0
-          blue: 1.0
-          brightness: 1.0
-          transition_length: 40ms
-      - light.turn_on:
-          id: strip2_group1
-          red: 1.0
-          green: 1.0
-          blue: 1.0
-          brightness: 1.0
-          transition_length: 40ms
-      - delay: 110ms
-      # Step 2: Back corners follow — base-to-top wave completes
+      # Step 1: Back corners ignite first
       - light.turn_on:
           id: strip1_group1
           red: 1.0
@@ -1020,6 +967,22 @@ script:
           transition_length: 40ms
       - light.turn_on:
           id: strip2_group2
+          red: 1.0
+          green: 1.0
+          blue: 1.0
+          brightness: 1.0
+          transition_length: 40ms
+      - delay: 110ms
+      # Step 2: Front corners follow and hold — sweep completes toward user
+      - light.turn_on:
+          id: strip1_group2
+          red: 1.0
+          green: 1.0
+          blue: 1.0
+          brightness: 1.0
+          transition_length: 40ms
+      - light.turn_on:
+          id: strip2_group1
           red: 1.0
           green: 1.0
           blue: 1.0
@@ -1047,21 +1010,21 @@ script:
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.28
+                brightness: 0.70
                 transition_length: 100ms
             - light.turn_on:
                 id: strip2_group2
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - light.turn_on:
                 id: strip1_group1
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - delay: 190ms
             - light.turn_on:
@@ -1076,21 +1039,21 @@ script:
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.28
+                brightness: 0.70
                 transition_length: 100ms
             - light.turn_on:
                 id: strip1_group1
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - light.turn_on:
                 id: strip1_group2
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - delay: 190ms
             - light.turn_on:
@@ -1105,21 +1068,21 @@ script:
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.28
+                brightness: 0.70
                 transition_length: 100ms
             - light.turn_on:
                 id: strip1_group2
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - light.turn_on:
                 id: strip2_group1
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - delay: 190ms
             - light.turn_on:
@@ -1134,96 +1097,107 @@ script:
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.28
+                brightness: 0.70
                 transition_length: 100ms
             - light.turn_on:
                 id: strip2_group1
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - light.turn_on:
                 id: strip2_group2
                 red: 1.0
                 green: 0.90
                 blue: 0.0
-                brightness: 0.08
+                brightness: 0.50
                 transition_length: 100ms
             - delay: 190ms
 
   - id: listening_pulse
     then:
       # All 4 strips breathe together: 100%↔50% cyan. ~2.3s cycle.
-      # while condition exits cleanly the moment phase leaves listening.
+      # Uses 6 explicit brightness steps (no ESPHome transition interpolation) to
+      # eliminate the constant I2C write storm from long transitions. Each lambda
+      # snaps all 4 strips atomically to the target brightness; delays shape the
+      # breathing curve. ~10 I2C writes/sec vs ~100/sec with transitions.
       - while:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
           then:
-            # Inhale — brighten to 100%
-            - light.turn_on:
-                id: strip1_group1
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 1.0
-                transition_length: 900ms
-            - light.turn_on:
-                id: strip1_group2
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 1.0
-                transition_length: 900ms
-            - light.turn_on:
-                id: strip2_group1
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 1.0
-                transition_length: 900ms
-            - light.turn_on:
-                id: strip2_group2
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 1.0
-                transition_length: 900ms
-            - delay: 1000ms
-            # Exhale — dim to 50% (slightly slower for natural feel)
-            - light.turn_on:
-                id: strip1_group1
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 0.50
-                transition_length: 1100ms
-            - light.turn_on:
-                id: strip1_group2
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 0.50
-                transition_length: 1100ms
-            - light.turn_on:
-                id: strip2_group1
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 0.50
-                transition_length: 1100ms
-            - light.turn_on:
-                id: strip2_group2
-                red: 0.0
-                green: 0.8
-                blue: 1.0
-                brightness: 0.50
-                transition_length: 1100ms
-            - delay: 1300ms
+            # Inhale — 0.50 → 1.00 over ~930ms (3 steps × 310ms)
+            - lambda: |-
+                auto s = [](light::LightState* l, float br) {
+                  auto c = l->turn_on(); c.set_rgb(0.0f, 0.8f, 1.0f);
+                  c.set_brightness(br); c.set_transition_length(0); c.perform();
+                };
+                s(id(strip1_group1), 0.67f); s(id(strip1_group2), 0.67f);
+                s(id(strip2_group1), 0.67f); s(id(strip2_group2), 0.67f);
+            - delay: 310ms
+            - lambda: |-
+                auto s = [](light::LightState* l, float br) {
+                  auto c = l->turn_on(); c.set_rgb(0.0f, 0.8f, 1.0f);
+                  c.set_brightness(br); c.set_transition_length(0); c.perform();
+                };
+                s(id(strip1_group1), 0.83f); s(id(strip1_group2), 0.83f);
+                s(id(strip2_group1), 0.83f); s(id(strip2_group2), 0.83f);
+            - delay: 310ms
+            - lambda: |-
+                auto s = [](light::LightState* l, float br) {
+                  auto c = l->turn_on(); c.set_rgb(0.0f, 0.8f, 1.0f);
+                  c.set_brightness(br); c.set_transition_length(0); c.perform();
+                };
+                s(id(strip1_group1), 1.00f); s(id(strip1_group2), 1.00f);
+                s(id(strip2_group1), 1.00f); s(id(strip2_group2), 1.00f);
+            # Hold at peak ~380ms (310 + 70ms extra)
+            - delay: 380ms
+            # Exhale — 1.00 → 0.50 over ~1100ms (3 steps × 367ms)
+            - lambda: |-
+                auto s = [](light::LightState* l, float br) {
+                  auto c = l->turn_on(); c.set_rgb(0.0f, 0.8f, 1.0f);
+                  c.set_brightness(br); c.set_transition_length(0); c.perform();
+                };
+                s(id(strip1_group1), 0.83f); s(id(strip1_group2), 0.83f);
+                s(id(strip2_group1), 0.83f); s(id(strip2_group2), 0.83f);
+            - delay: 367ms
+            - lambda: |-
+                auto s = [](light::LightState* l, float br) {
+                  auto c = l->turn_on(); c.set_rgb(0.0f, 0.8f, 1.0f);
+                  c.set_brightness(br); c.set_transition_length(0); c.perform();
+                };
+                s(id(strip1_group1), 0.67f); s(id(strip1_group2), 0.67f);
+                s(id(strip2_group1), 0.67f); s(id(strip2_group2), 0.67f);
+            - delay: 367ms
+            - lambda: |-
+                auto s = [](light::LightState* l, float br) {
+                  auto c = l->turn_on(); c.set_rgb(0.0f, 0.8f, 1.0f);
+                  c.set_brightness(br); c.set_transition_length(0); c.perform();
+                };
+                s(id(strip1_group1), 0.50f); s(id(strip1_group2), 0.50f);
+                s(id(strip2_group1), 0.50f); s(id(strip2_group2), 0.50f);
+            # Hold at trough ~566ms (367 + 200ms extra)
+            - delay: 566ms
 
   - id: draw_display
     then:
       - script.execute: update_leds
+      # Stop any running display animation loops before switching pages
+      - if:
+          condition:
+            lambda: return ${dynamic_display};
+          then:
+            - script.stop: anim_listening_loop
+            - script.stop: anim_thinking_loop
+            - script.stop: anim_replying_loop
+            - script.stop: anim_loading_loop
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - component.resume: pyramid_touch
+          else:
+            - component.suspend: pyramid_touch
       - if:
           condition:
             lambda: return !id(init_in_progress);
@@ -1237,39 +1211,60 @@ script:
                         api.connected:
                       then:
                         - lambda: |
-                            switch(id(voice_assistant_phase)) {
-                              case ${voice_assist_listening_phase_id}:
-                                id(atoms3r_lcd).show_page(listening_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              case ${voice_assist_thinking_phase_id}:
-                                id(atoms3r_lcd).show_page(thinking_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              case ${voice_assist_replying_phase_id}:
-                                id(atoms3r_lcd).show_page(replying_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              case ${voice_assist_error_phase_id}:
-                                id(atoms3r_lcd).show_page(error_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              case ${voice_assist_timer_finished_phase_id}:
-                                id(atoms3r_lcd).show_page(timer_finished_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              case ${voice_assist_muted_phase_id}:
-                                id(atoms3r_lcd).show_page(muted_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              case ${voice_assist_not_ready_phase_id}:
-                                id(atoms3r_lcd).show_page(no_ha_page);
-                                id(atoms3r_lcd).update();
-                                break;
-                              default:
-                                id(atoms3r_lcd).show_page(idle_page);
-                                id(atoms3r_lcd).update();
+                            // Check if this is an animated state and dynamic display is enabled
+                            int phase = id(voice_assistant_phase);
+                            bool use_anim = ${dynamic_display} && (
+                              phase == ${voice_assist_listening_phase_id} ||
+                              phase == ${voice_assist_thinking_phase_id} ||
+                              phase == ${voice_assist_replying_phase_id}
+                            );
+                            if (!use_anim) {
+                              // Static PNG pages for non-animated states or when dynamic_display is off
+                              switch(phase) {
+                                case ${voice_assist_listening_phase_id}:
+                                  id(atoms3r_lcd).show_page(listening_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                case ${voice_assist_thinking_phase_id}:
+                                  id(atoms3r_lcd).show_page(thinking_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                case ${voice_assist_replying_phase_id}:
+                                  id(atoms3r_lcd).show_page(replying_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                case ${voice_assist_error_phase_id}:
+                                  id(atoms3r_lcd).show_page(error_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                case ${voice_assist_timer_finished_phase_id}:
+                                  id(atoms3r_lcd).show_page(timer_finished_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                case ${voice_assist_muted_phase_id}:
+                                  id(atoms3r_lcd).show_page(muted_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                case ${voice_assist_not_ready_phase_id}:
+                                  id(atoms3r_lcd).show_page(no_ha_page);
+                                  id(atoms3r_lcd).update();
+                                  break;
+                                default:
+                                  id(atoms3r_lcd).show_page(idle_page);
+                                  id(atoms3r_lcd).update();
+                              }
                             }
+                        # Start animated display if dynamic_display is enabled and phase is animatable
+                        - if:
+                            condition:
+                              lambda: |-
+                                if (!${dynamic_display}) return false;
+                                int phase = id(voice_assistant_phase);
+                                return phase == ${voice_assist_listening_phase_id} ||
+                                       phase == ${voice_assist_thinking_phase_id} ||
+                                       phase == ${voice_assist_replying_phase_id};
+                            then:
+                              - script.execute: start_display_animation
                       else:
                         - display.page.show: no_ha_page
                         - component.update: atoms3r_lcd
@@ -1277,8 +1272,15 @@ script:
                   - display.page.show: no_wifi_page
                   - component.update: atoms3r_lcd
           else:
-            - display.page.show: initializing_page
-            - component.update: atoms3r_lcd
+            # Loading/initializing — use animated spinner if dynamic display enabled
+            - if:
+                condition:
+                  lambda: return ${dynamic_display};
+                then:
+                  - script.execute: start_loading_animation
+                else:
+                  - display.page.show: initializing_page
+                  - component.update: atoms3r_lcd
 
   - id: update_leds
     then:
@@ -1306,8 +1308,8 @@ script:
             case 2: // listening — bright cyan, front full, back half (toward user)
               set_strip(id(strip1_group2), 0.0, 0.8, 1.0, 0.90, 200); // front left
               set_strip(id(strip2_group1), 0.0, 0.8, 1.0, 0.90, 200); // front right
-              set_strip(id(strip1_group1), 0.0, 0.8, 1.0, 0.45, 200); // back left
-              set_strip(id(strip2_group2), 0.0, 0.8, 1.0, 0.45, 200); // back right
+              set_strip(id(strip1_group1), 0.0, 0.8, 1.0, 0.50, 200); // back left
+              set_strip(id(strip2_group2), 0.0, 0.8, 1.0, 0.50, 200); // back right
               break;
             case 3: // thinking — yellow
               set_strip(id(strip1_group1), 1.0, 0.90, 0.0, 0.65, 400);

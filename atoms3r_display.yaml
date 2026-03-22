@@ -1,0 +1,537 @@
+# ─────────────────────────────────────────────────────────────────────
+# atoms3r_display.yaml — Display component + animated display pages
+# Included via packages: in echo-pyramid.yaml
+#
+# Contains: full display hardware config, all static PNG pages,
+# and procedural animation pages (listening rings, matrix rain,
+# waveform bars, loading spinner).
+# ─────────────────────────────────────────────────────────────────────
+
+# ── Animation fonts ─────────────────────────────────────────────────
+font:
+  - file: "gfonts://Share Tech Mono"
+    id: anim_font_sm
+    size: 10
+    glyphs: " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+  - file: "gfonts://Share Tech Mono"
+    id: anim_font_md
+    size: 14
+    glyphs: " []ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+
+# ── Animation globals ──────────────────────────────────────────────
+globals:
+  - id: anim_ring_phase
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: anim_spin_angle
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: anim_wave_tick
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: anim_seed
+    type: uint32_t
+    restore_value: false
+    initial_value: "12345"
+
+# ── Animation colors ───────────────────────────────────────────────
+color:
+  - id: anim_cyan
+    red: 0%
+    green: 80%
+    blue: 100%
+  - id: anim_cyan_dim
+    red: 0%
+    green: 30%
+    blue: 40%
+  - id: anim_green
+    red: 0%
+    green: 100%
+    blue: 25%
+  - id: anim_green_dim
+    red: 0%
+    green: 40%
+    blue: 10%
+  - id: anim_green_dark
+    red: 0%
+    green: 20%
+    blue: 5%
+  - id: anim_teal
+    red: 0%
+    green: 60%
+    blue: 50%
+
+# ── Display hardware + all pages ───────────────────────────────────
+display:
+  - platform: mipi_spi
+    id: atoms3r_lcd
+    model: ST7789V
+    dc_pin: GPIO42
+    reset_pin: GPIO48
+    cs_pin: GPIO14
+    data_rate: 40MHz
+    dimensions:
+      height: 128
+      width: 128
+      offset_width: 2
+      offset_height: 1
+    invert_colors: true
+    rotation: 0°
+    pages:
+      # ════════════════════════════════════════════════════════════════
+      # STATIC PNG PAGES
+      # ════════════════════════════════════════════════════════════════
+      - id: idle_page
+        lambda: |-
+          it.fill(id(idle_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_idle), ImageAlign::CENTER);
+      - id: listening_page
+        lambda: |-
+          it.fill(id(listening_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_listening), ImageAlign::CENTER);
+      - id: thinking_page
+        lambda: |-
+          it.fill(id(thinking_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_thinking), ImageAlign::CENTER);
+      - id: replying_page
+        lambda: |-
+          it.fill(id(replying_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_replying), ImageAlign::CENTER);
+      - id: error_page
+        lambda: |-
+          it.fill(id(error_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_error), ImageAlign::CENTER);
+      - id: no_ha_page
+        lambda: |-
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_ha), ImageAlign::CENTER);
+      - id: no_wifi_page
+        lambda: |-
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(error_no_wifi), ImageAlign::CENTER);
+      - id: initializing_page
+        lambda: |-
+          it.fill(id(loading_color));
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_initializing), ImageAlign::CENTER);
+      - id: timer_finished_page
+        lambda: |-
+          it.fill(Color::BLACK);
+          it.image((it.get_width() / 2), (it.get_height() / 2), id(casita_timer_finished), ImageAlign::CENTER);
+      - id: muted_page
+        lambda: |-
+          it.fill(Color::BLACK);
+          it.printf(0, 0, id(mdi_icon_128), Color::WHITE, "%s", "\U000F036D");
+
+      # ════════════════════════════════════════════════════════════════
+      # ANIMATED PAGES (used when dynamic_display: "true")
+      # ════════════════════════════════════════════════════════════════
+
+      # ── Listening: pulsing concentric rings ────────────────────────
+      - id: listening_anim_page
+        lambda: |-
+          const int W = it.get_width();
+          const int H = it.get_height();
+          const int cx = W / 2;
+          const int cy = H / 2;
+          int phase = id(anim_ring_phase);
+
+          it.fill(Color::BLACK);
+
+          // Corner brackets (terminal chrome)
+          it.line(0, 0, 10, 0, id(anim_cyan_dim));
+          it.line(0, 0, 0, 10, id(anim_cyan_dim));
+          it.line(W-1, 0, W-11, 0, id(anim_cyan_dim));
+          it.line(W-1, 0, W-1, 10, id(anim_cyan_dim));
+          it.line(0, H-1, 10, H-1, id(anim_cyan_dim));
+          it.line(0, H-1, 0, H-11, id(anim_cyan_dim));
+          it.line(W-1, H-1, W-11, H-1, id(anim_cyan_dim));
+          it.line(W-1, H-1, W-1, H-11, id(anim_cyan_dim));
+
+          // Header
+          it.printf(cx, 6, id(anim_font_md), id(anim_cyan), TextAlign::TOP_CENTER, "[ LISTENING ]");
+
+          // Concentric rings expanding outward from center
+          // 4 rings spaced 15 phase-units apart, expanding radius 5..50px
+          for (int ring = 0; ring < 4; ring++) {
+            int ring_phase = (phase - ring * 15 + 60) % 60;
+            int radius = 5 + (ring_phase * 45) / 60;
+            // Brightness fades as ring expands
+            float fade = 1.0f - (float)ring_phase / 60.0f;
+            uint8_t g = (uint8_t)(204 * fade);
+            uint8_t b = (uint8_t)(255 * fade);
+            Color c(0, g, b);
+            if (fade > 0.05f) {
+              it.circle(cx, cy, radius, c);
+              if (fade > 0.5f && radius > 6) {
+                it.circle(cx, cy, radius - 1, c);
+              }
+            }
+          }
+
+          // Center dot (always visible)
+          it.filled_circle(cx, cy, 3, id(anim_cyan));
+
+          // Blinking recording indicator
+          if ((phase / 10) % 2) {
+            it.filled_circle(10, 8, 3, id(anim_cyan));
+          }
+
+          // Footer
+          it.printf(cx, H - 6, id(anim_font_sm), id(anim_cyan_dim), TextAlign::BOTTOM_CENTER, "VOICE INPUT ACTIVE");
+
+      # ── Thinking: matrix rain ──────────────────────────────────────
+      - id: thinking_anim_page
+        lambda: |-
+          const int W = it.get_width();
+          const int H = it.get_height();
+          const int cx = W / 2;
+          const int COLS = 16;
+          const int CHAR_W = 8;
+          const int CHAR_H = 12;
+          const int TRAIL = 6;
+          const int HEADER_Y = 20;
+          const int FOOTER_Y = H - 14;
+
+          // Persistent column state across frames
+          static int col_y[COLS] = {0};
+          static int col_speed[COLS] = {0};
+          static bool initialized = false;
+          static uint32_t seed = 12345;
+
+          auto rng = [&]() -> uint32_t {
+            seed = seed * 1664525u + 1013904223u;
+            return seed;
+          };
+
+          if (!initialized) {
+            seed = id(anim_seed);
+            for (int i = 0; i < COLS; i++) {
+              col_y[i] = rng() % H;
+              col_speed[i] = 2 + (rng() % 3);
+            }
+            initialized = true;
+          }
+
+          it.fill(Color::BLACK);
+
+          // Corner brackets
+          it.line(0, 0, 10, 0, id(anim_green_dim));
+          it.line(0, 0, 0, 10, id(anim_green_dim));
+          it.line(W-1, 0, W-11, 0, id(anim_green_dim));
+          it.line(W-1, 0, W-1, 10, id(anim_green_dim));
+          it.line(0, H-1, 10, H-1, id(anim_green_dim));
+          it.line(0, H-1, 0, H-11, id(anim_green_dim));
+          it.line(W-1, H-1, W-11, H-1, id(anim_green_dim));
+          it.line(W-1, H-1, W-1, H-11, id(anim_green_dim));
+
+          // Draw falling characters
+          const char glyphs[] = "0123456789ABCDEF<>{}|/\\*=#@";
+          const int glyph_count = sizeof(glyphs) - 1;
+
+          for (int col = 0; col < COLS; col++) {
+            int x = col * CHAR_W;
+            int head_y = col_y[col];
+
+            for (int t = 0; t < TRAIL; t++) {
+              int char_y = head_y - t * CHAR_H;
+              if (char_y < 0) char_y += H;
+              if (char_y < HEADER_Y || char_y > FOOTER_Y) continue;
+
+              uint8_t g, b;
+              if (t == 0) {
+                g = 255; b = 65;       // head: brightest
+              } else {
+                float fade = 1.0f - (float)t / (float)TRAIL;
+                g = (uint8_t)(200 * fade * fade);
+                b = (uint8_t)(50 * fade * fade);
+              }
+              Color c(0, g, b);
+              uint32_t char_hash = rng();
+              char ch = glyphs[char_hash % glyph_count];
+              it.printf(x, char_y, id(anim_font_sm), c, "%c", ch);
+            }
+
+            col_y[col] = (head_y + col_speed[col]) % H;
+            if ((rng() % 200) < 3) {
+              col_y[col] = HEADER_Y;
+              col_speed[col] = 2 + (rng() % 3);
+            }
+          }
+
+          id(anim_seed) = seed;
+
+          // Header overlay (drawn last to cover matrix chars)
+          it.filled_rectangle(0, 0, W, HEADER_Y, Color::BLACK);
+          it.printf(cx, 4, id(anim_font_md), id(anim_green), TextAlign::TOP_CENTER, "[ PROCESSING ]");
+
+          // Footer overlay with animated dots
+          it.filled_rectangle(0, FOOTER_Y, W, H - FOOTER_Y, Color::BLACK);
+          static int dot_phase = 0;
+          dot_phase = (dot_phase + 1) % 4;
+          const char* dots[] = {"ANALYZING", "ANALYZING.", "ANALYZING..", "ANALYZING..."};
+          it.printf(cx, H - 4, id(anim_font_sm), id(anim_green_dim), TextAlign::BOTTOM_CENTER, "%s", dots[dot_phase]);
+
+      # ── Replying: audio waveform bars ──────────────────────────────
+      - id: replying_anim_page
+        lambda: |-
+          const int W = it.get_width();
+          const int H = it.get_height();
+          const int cx = W / 2;
+          const int BARS = 16;
+          const int BAR_W = 6;
+          const int GAP = 2;
+          const int BAR_AREA_TOP = 28;
+          const int BAR_AREA_BOTTOM = H - 18;
+          const int MAX_BAR_H = BAR_AREA_BOTTOM - BAR_AREA_TOP;
+          const int BAR_START_X = (W - BARS * (BAR_W + GAP) + GAP) / 2;
+
+          static float bar_h[BARS] = {0};
+          static float bar_target[BARS] = {0};
+          static uint32_t seed = 54321;
+
+          auto rng = [&]() -> uint32_t {
+            seed = seed * 1664525u + 1013904223u;
+            return seed;
+          };
+
+          int tick = id(anim_wave_tick);
+
+          // Pick new random targets every 4 frames
+          if (tick % 4 == 0) {
+            for (int i = 0; i < BARS; i++) {
+              float center_bias = 1.0f - (float)abs(i - BARS/2) / (float)(BARS/2);
+              float random_factor = (float)(rng() % 100) / 100.0f;
+              bar_target[i] = (0.2f + 0.8f * center_bias * random_factor) * MAX_BAR_H;
+            }
+          }
+
+          // Smooth interpolation toward targets
+          for (int i = 0; i < BARS; i++) {
+            bar_h[i] += (bar_target[i] - bar_h[i]) * 0.3f;
+            if (bar_h[i] < 2.0f) bar_h[i] = 2.0f;
+          }
+
+          it.fill(Color::BLACK);
+
+          // Corner brackets
+          it.line(0, 0, 10, 0, id(anim_cyan_dim));
+          it.line(0, 0, 0, 10, id(anim_cyan_dim));
+          it.line(W-1, 0, W-11, 0, id(anim_cyan_dim));
+          it.line(W-1, 0, W-1, 10, id(anim_cyan_dim));
+          it.line(0, H-1, 10, H-1, id(anim_cyan_dim));
+          it.line(0, H-1, 0, H-11, id(anim_cyan_dim));
+          it.line(W-1, H-1, W-11, H-1, id(anim_cyan_dim));
+          it.line(W-1, H-1, W-1, H-11, id(anim_cyan_dim));
+
+          // Draw bars with color gradient
+          for (int i = 0; i < BARS; i++) {
+            int x = BAR_START_X + i * (BAR_W + GAP);
+            int h = (int)bar_h[i];
+            int y = BAR_AREA_BOTTOM - h;
+
+            int seg1_h = h / 3;
+            int seg2_h = h / 3;
+            int seg3_h = h - seg1_h - seg2_h;
+
+            // Bottom: dark teal
+            it.filled_rectangle(x, BAR_AREA_BOTTOM - seg1_h, BAR_W, seg1_h, id(anim_teal));
+            // Middle: dim cyan
+            it.filled_rectangle(x, BAR_AREA_BOTTOM - seg1_h - seg2_h, BAR_W, seg2_h, id(anim_cyan_dim));
+            // Top: bright cyan
+            it.filled_rectangle(x, y, BAR_W, seg3_h, id(anim_cyan));
+
+            // Floating peak dot
+            if (h > 10) {
+              it.filled_rectangle(x, y - 3, BAR_W, 1, id(anim_cyan));
+            }
+          }
+
+          // Baseline
+          it.line(BAR_START_X - 2, BAR_AREA_BOTTOM, BAR_START_X + BARS * (BAR_W + GAP), BAR_AREA_BOTTOM, id(anim_cyan_dim));
+
+          // Header
+          it.printf(cx, 4, id(anim_font_md), id(anim_cyan), TextAlign::TOP_CENTER, "[ REPLYING ]");
+
+          // Footer with scrolling chevrons
+          static int chevron_phase = 0;
+          chevron_phase = (chevron_phase + 1) % 3;
+          const char* chevrons[] = {">  RESPONSE STREAM", ">> RESPONSE STREAM", ">>>RESPONSE STREAM"};
+          it.printf(cx, H - 4, id(anim_font_sm), id(anim_cyan_dim), TextAlign::BOTTOM_CENTER, "%s", chevrons[chevron_phase]);
+
+      # ── Loading: spinning indicator ────────────────────────────────
+      - id: loading_anim_page
+        lambda: |-
+          const int W = it.get_width();
+          const int H = it.get_height();
+          const int cx = W / 2;
+          const int cy = H / 2;
+          const int NUM_DOTS = 8;
+          const int ORBIT_R = 28;
+          const int DOT_R = 4;
+          int active = id(anim_spin_angle);
+
+          it.fill(Color::BLACK);
+
+          // Corner brackets
+          it.line(0, 0, 10, 0, id(anim_green_dim));
+          it.line(0, 0, 0, 10, id(anim_green_dim));
+          it.line(W-1, 0, W-11, 0, id(anim_green_dim));
+          it.line(W-1, 0, W-1, 10, id(anim_green_dim));
+          it.line(0, H-1, 10, H-1, id(anim_green_dim));
+          it.line(0, H-1, 0, H-11, id(anim_green_dim));
+          it.line(W-1, H-1, W-11, H-1, id(anim_green_dim));
+          it.line(W-1, H-1, W-1, H-11, id(anim_green_dim));
+
+          // Outer tick marks (clock-like ring)
+          for (int i = 0; i < 16; i++) {
+            float angle = i * 3.14159f * 2.0f / 16.0f - 3.14159f / 2.0f;
+            int inner_r = ORBIT_R + 10;
+            int outer_r = ORBIT_R + 14;
+            int x1 = cx + (int)(inner_r * cosf(angle));
+            int y1 = cy + (int)(inner_r * sinf(angle));
+            int x2 = cx + (int)(outer_r * cosf(angle));
+            int y2 = cy + (int)(outer_r * sinf(angle));
+            it.line(x1, y1, x2, y2, id(anim_green_dark));
+          }
+
+          // Orbiting dots with brightness falloff
+          for (int i = 0; i < NUM_DOTS; i++) {
+            float angle = i * 3.14159f * 2.0f / NUM_DOTS - 3.14159f / 2.0f;
+            int dx = cx + (int)(ORBIT_R * cosf(angle));
+            int dy = cy + (int)(ORBIT_R * sinf(angle));
+
+            int dist = (i - active + NUM_DOTS) % NUM_DOTS;
+            if (dist > NUM_DOTS / 2) dist = NUM_DOTS - dist;
+
+            uint8_t g, b;
+            int r = DOT_R;
+            if (dist == 0) {
+              g = 255; b = 65; r = DOT_R;
+            } else if (dist == 1) {
+              g = 160; b = 40; r = DOT_R - 1;
+            } else if (dist == 2) {
+              g = 80; b = 20; r = DOT_R - 1;
+            } else {
+              g = 30; b = 8; r = DOT_R - 2;
+            }
+            if (r < 1) r = 1;
+            Color c(0, g, b);
+            it.filled_circle(dx, dy, r, c);
+          }
+
+          // Center label
+          it.printf(cx, cy + 2, id(anim_font_sm), id(anim_green_dim), TextAlign::CENTER, "INIT");
+
+          // Header
+          it.printf(cx, 4, id(anim_font_md), id(anim_green), TextAlign::TOP_CENTER, "[ LOADING ]");
+
+          // Progress bar
+          static int progress = 0;
+          progress = (progress + 1) % 100;
+          int bar_w = 80;
+          int bar_x = (W - bar_w) / 2;
+          int bar_y = H - 22;
+          it.rectangle(bar_x, bar_y, bar_w, 6, id(anim_green_dim));
+          int fill_w = (progress * (bar_w - 2)) / 100;
+          if (fill_w > 0) {
+            it.filled_rectangle(bar_x + 1, bar_y + 1, fill_w, 4, id(anim_green));
+          }
+
+          // Footer
+          it.printf(cx, H - 4, id(anim_font_sm), id(anim_green_dim), TextAlign::BOTTOM_CENTER, "SYSTEMS BOOTING...");
+
+# ── Animation loop scripts ─────────────────────────────────────────
+script:
+  - id: anim_listening_loop
+    mode: single
+    then:
+      - lambda: id(anim_ring_phase) = 0;
+      - while:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+          then:
+            - lambda: id(anim_ring_phase) = (id(anim_ring_phase) + 1) % 60;
+            - component.update: atoms3r_lcd
+            - delay: 50ms
+
+  - id: anim_thinking_loop
+    mode: single
+    then:
+      - while:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
+          then:
+            - component.update: atoms3r_lcd
+            - delay: 70ms
+
+  - id: anim_replying_loop
+    mode: single
+    then:
+      - lambda: id(anim_wave_tick) = 0;
+      - while:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
+          then:
+            - lambda: id(anim_wave_tick) = id(anim_wave_tick) + 1;
+            - component.update: atoms3r_lcd
+            - delay: 50ms
+
+  - id: anim_loading_loop
+    mode: single
+    then:
+      - lambda: id(anim_spin_angle) = 0;
+      - while:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_not_ready_phase_id} || id(init_in_progress);
+          then:
+            - lambda: id(anim_spin_angle) = (id(anim_spin_angle) + 1) % 8;
+            - component.update: atoms3r_lcd
+            - delay: 100ms
+
+  # ── Master animation controller ──────────────────────────────────
+  - id: start_display_animation
+    mode: restart
+    then:
+      - script.stop: anim_listening_loop
+      - script.stop: anim_thinking_loop
+      - script.stop: anim_replying_loop
+      - script.stop: anim_loading_loop
+      - lambda: |-
+          int phase = id(voice_assistant_phase);
+          auto* lcd = id(atoms3r_lcd);
+          switch (phase) {
+            case ${voice_assist_listening_phase_id}:
+              lcd->show_page(listening_anim_page);
+              break;
+            case ${voice_assist_thinking_phase_id}:
+              lcd->show_page(thinking_anim_page);
+              break;
+            case ${voice_assist_replying_phase_id}:
+              lcd->show_page(replying_anim_page);
+              break;
+            default:
+              break;
+          }
+      - component.update: atoms3r_lcd
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+          then:
+            - script.execute: anim_listening_loop
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
+          then:
+            - script.execute: anim_thinking_loop
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
+          then:
+            - script.execute: anim_replying_loop
+
+  - id: start_loading_animation
+    mode: restart
+    then:
+      - lambda: id(atoms3r_lcd)->show_page(loading_anim_page);
+      - script.execute: anim_loading_loop
